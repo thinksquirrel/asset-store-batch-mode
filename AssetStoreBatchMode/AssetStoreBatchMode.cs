@@ -50,15 +50,26 @@ public static class AssetStoreBatchMode
     /// </summary>
     public static void UploadAssetStorePackage(params string[] args)
     {
-        var username = string.Empty;
-        var password = string.Empty;
-        var packageName = string.Empty;
-        string rootPath = null;
+        var username = Environment.GetEnvironmentVariable("ASSET_STORE_USERNAME");
+        var password = Environment.GetEnvironmentVariable("ASSET_STORE_PASSWORD");
+        var packageName = Environment.GetEnvironmentVariable("ASSET_STORE_PACKAGE_NAME");
+        string rootPath = Environment.GetEnvironmentVariable("ASSET_STORE_ROOT_PATH");
         var loginTimeout = 10;
         var metadataTimeout = 300;
         var uploadTimeout = 36000;
+
         var mainAssets = new List<string>();
 
+        var mainAssetsStr = Environment.GetEnvironmentVariable("ASSET_STORE_MAIN_ASSETS");
+        if (mainAssetsStr != null)
+        {
+            var mainAssetsSplit = mainAssetsStr.Split(':');
+            for(var i = 0; i < mainAssetsSplit.Length; ++i)
+            {
+                mainAssets.Add(mainAssetsSplit[i]);
+            }
+        }
+        
         var assets = mainAssets;
         var opt = new OptionSet
         {
