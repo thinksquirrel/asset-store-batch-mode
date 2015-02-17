@@ -4,7 +4,7 @@ Provides an API for uploading Unity Asset Store packages in batch mode.
 ## Installation/usage
 1. Grab and import the latest Asset Store tools [here](http://u3d.as/1sF).
 2. Since this is an unofficial API, it's recommended to create a separate Unity account and password (ex: asset-store-api@example.com), and add that account to your publisher administration. Hopefully in the future this can be replaced with an API key.
-3. Place this repo in the Asset
+3. Clone this repository into the AssetStoreTools/Editor folder.
 4. Call Unity from the command line with `-executeMethod AssetStoreBatchMode.UploadAssetStorePackage`, or call `AssetStoreBatchMode.UploadAssetStorePackage()` (or one of its overloads) from a script. Your package must be placed in draft mode manually for uploads to work.
 5. For command line arguments, see AssetStoreBatchMode.cs.
 
