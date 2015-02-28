@@ -40,6 +40,9 @@ public static class AssetStoreBatchMode
     /// <summary>
     /// Upload a package, using the command line arguments of the current environment.
     /// </summary>
+    /// <remarks>
+    /// The Asset Store account password must be provided via the "ASSET_STORE_PASSWORD" environment variable.
+    /// </remarks>
     public static void UploadAssetStorePackage()
     {
         UploadAssetStorePackage(Environment.GetCommandLineArgs());   
@@ -48,6 +51,9 @@ public static class AssetStoreBatchMode
     /// <summary>
     /// Upload a package, using the specified command line arguments.
     /// </summary>
+    /// <remarks>
+    /// The Asset Store account password must be provided via the "ASSET_STORE_PASSWORD" environment variable.
+    /// </remarks>
     public static void UploadAssetStorePackage(params string[] args)
     {
         var username = Environment.GetEnvironmentVariable("ASSET_STORE_USERNAME");
@@ -76,10 +82,6 @@ public static class AssetStoreBatchMode
             { "asset_store_username=",
                 "The username credentials to use for package uploading.",
                 o => username = o },
-
-            { "asset_store_password=",
-                "The password credentials to use for package uploading.",
-                o => password = o },
 
             { "asset_store_package_name=",
                 "The package name. The package must be set to draft status in the Publisher Administration.",
