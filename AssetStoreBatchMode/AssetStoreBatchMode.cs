@@ -28,6 +28,7 @@ public static class AssetStoreBatchMode
     static int s_LoginTimeout;
     static int s_MetadataTimeout;
     static int s_UploadTimeout;
+    static bool s_SkipProjectSettings;
 
     static readonly AssetStorePublisher s_PublisherAccount = new AssetStorePublisher();
     static readonly PackageDataSource s_PackageDataSource = new PackageDataSource();
@@ -59,10 +60,11 @@ public static class AssetStoreBatchMode
         var username = Environment.GetEnvironmentVariable("ASSET_STORE_USERNAME");
         var password = Environment.GetEnvironmentVariable("ASSET_STORE_PASSWORD");
         var packageName = Environment.GetEnvironmentVariable("ASSET_STORE_PACKAGE_NAME");
-        string rootPath = Environment.GetEnvironmentVariable("ASSET_STORE_ROOT_PATH");
+        var rootPath = Environment.GetEnvironmentVariable("ASSET_STORE_ROOT_PATH");
         var loginTimeout = 10;
         var metadataTimeout = 300;
         var uploadTimeout = 36000;
+        var skipProjectSettings = false;
 
         var mainAssets = new List<string>();
 
@@ -89,8 +91,8 @@ public static class AssetStoreBatchMode
 
             { "asset_store_root_path=",
                 "The root path of the package (relative to Application.dataPath). If not present, use the project Assets folder.",
-                o => rootPath = o },
-                
+                o => rootPath = o },            
+			
             { "asset_store_main_asset=",
                 "A main asset for the package (relative to Application.dataPath). Multiple options are allowed. If not present, do not upload or change any main assets.",
                 assets.Add },
@@ -105,12 +107,16 @@ public static class AssetStoreBatchMode
 
             { "asset_store_upload_timeout=",
                 "The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.",
-                (int o) => uploadTimeout = o }
+                (int o) => uploadTimeout = o },
+            
+            { "skip_project_settings",
+                "If true, always skip project settings export. This only applies to assets in the Complete Projects category.",
+                o => skipProjectSettings = o != null }
         };
 
         opt.Parse(args);
 
-        UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout);
+        UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings);
     }
     /// <summary>
     /// Upload a package, using the specified options.
@@ -123,7 +129,7 @@ public static class AssetStoreBatchMode
     /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 10 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
     /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 300 seconds. Must be within 2 and 36000 seconds.</param>
     /// <param name="uploadTimeout">The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.</param>
-    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 10, int metadataTimeout = 300, int uploadTimeout = 36000)
+    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 10, int metadataTimeout = 300, int uploadTimeout = 36000, bool skipProjectSettings = false)
     {
         if (string.IsNullOrEmpty(username))
             throw new ArgumentNullException("username");
@@ -142,6 +148,7 @@ public static class AssetStoreBatchMode
         s_LoginTimeout = Mathf.Clamp(loginTimeout, 2, 36000);
         s_MetadataTimeout = Mathf.Clamp(metadataTimeout, 2, 36000);
         s_UploadTimeout = Mathf.Clamp(uploadTimeout, 2, 36000);
+		s_SkipProjectSettings = skipProjectSettings;
 
         Finish();
 
@@ -402,7 +409,7 @@ public static class AssetStoreBatchMode
     }
     static string[] GetGUIDS(Package package, string localRootPath)
     {
-        var includeProjectSettings = package.IsCompleteProjects;            
+        var includeProjectSettings = package.IsCompleteProjects && !s_SkipProjectSettings;            
         var str1 = "Assets" + (localRootPath ?? string.Empty);
         var chars = new[] { (char)47 };
         var path1 = str1.Trim(chars);
