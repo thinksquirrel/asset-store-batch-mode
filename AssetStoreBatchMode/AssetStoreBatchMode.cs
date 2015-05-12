@@ -29,6 +29,8 @@ public static class AssetStoreBatchMode
     static int s_MetadataTimeout;
     static int s_UploadTimeout;
     static bool s_SkipProjectSettings;
+    static bool s_SkipUpload;
+    static string s_PackageDestination;
 
     static readonly AssetStorePublisher s_PublisherAccount = new AssetStorePublisher();
     static readonly PackageDataSource s_PackageDataSource = new PackageDataSource();
@@ -65,7 +67,9 @@ public static class AssetStoreBatchMode
         var metadataTimeout = 300;
         var uploadTimeout = 36000;
         var skipProjectSettings = false;
-
+        var skipUpload = false;
+        string packageDestination = null;
+        
         var mainAssets = new List<string>();
 
         var mainAssetsStr = Environment.GetEnvironmentVariable("ASSET_STORE_MAIN_ASSETS");
@@ -92,7 +96,7 @@ public static class AssetStoreBatchMode
             { "asset_store_root_path=",
                 "The root path of the package (relative to Application.dataPath). If not present, use the project Assets folder.",
                 o => rootPath = o },            
-			
+            
             { "asset_store_main_asset=",
                 "A main asset for the package (relative to Application.dataPath). Multiple options are allowed. If not present, do not upload or change any main assets.",
                 assets.Add },
@@ -111,12 +115,22 @@ public static class AssetStoreBatchMode
             
             { "skip_project_settings",
                 "If true, always skip project settings export. This only applies to assets in the Complete Projects category.",
-                o => skipProjectSettings = o != null }
+                o => skipProjectSettings = o != null },
+            
+            { "skip_upload",
+                "If true, skip uploading the product to the asset store.",
+                o => skipUpload = o != null },
+            
+            { "package_destination=",
+                "Path to copy the built .unitypackage to after creation.",
+                o => packageDestination = o }
         };
 
         opt.Parse(args);
 
-        UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings);
+        Debug.Log(packageDestination);
+
+        UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings, skipUpload, packageDestination);
     }
     /// <summary>
     /// Upload a package, using the specified options.
@@ -129,7 +143,9 @@ public static class AssetStoreBatchMode
     /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 10 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
     /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 300 seconds. Must be within 2 and 36000 seconds.</param>
     /// <param name="uploadTimeout">The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.</param>
-    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 10, int metadataTimeout = 300, int uploadTimeout = 36000, bool skipProjectSettings = false)
+    /// <param name="skipUpload">Skip uploading to the asset store.</param>
+    /// <param name="packageDestination">Path to copy the uploaded package to when completed.</param>
+    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 10, int metadataTimeout = 300, int uploadTimeout = 36000, bool skipProjectSettings = false, bool skipUpload = false, string packageDestination = null)
     {
         if (string.IsNullOrEmpty(username))
             throw new ArgumentNullException("username");
@@ -148,7 +164,9 @@ public static class AssetStoreBatchMode
         s_LoginTimeout = Mathf.Clamp(loginTimeout, 2, 36000);
         s_MetadataTimeout = Mathf.Clamp(metadataTimeout, 2, 36000);
         s_UploadTimeout = Mathf.Clamp(uploadTimeout, 2, 36000);
-		s_SkipProjectSettings = skipProjectSettings;
+        s_SkipProjectSettings = skipProjectSettings;
+        s_SkipUpload = skipUpload;
+        s_PackageDestination = packageDestination;
 
         Finish();
 
@@ -198,7 +216,7 @@ public static class AssetStoreBatchMode
             return;
         }
 
-        if (package.Status != Package.PublishedStatus.Draft)
+        if (!s_SkipUpload && package.Status != Package.PublishedStatus.Draft)
         {
             Debug.Log("[Asset Store Batch Mode] Package: " + s_PackageName + " is not in draft status. Cancelling upload.");
             Finish();
@@ -237,6 +255,25 @@ public static class AssetStoreBatchMode
 
         Export(package, localRootPath, draftAssetsPath);
 
+        Debug.Log("[Asset Store Batch Mode] Package Path: " + draftAssetsPath);
+        
+        if(!string.IsNullOrEmpty(s_PackageDestination))
+        {
+            
+            Debug.Log("[Asset Store Batch Mode] Copying package to " + s_PackageDestination);
+            File.Copy(draftAssetsPath, s_PackageDestination);
+
+        }
+        
+        if(s_SkipUpload) 
+        {
+            
+            Debug.Log("[Asset Store Batch Mode] Dry run completed.");
+            Finish();
+            return;
+            
+        }
+        
         // Upload assets
         AssetStoreAPI.UploadAssets(
             package,
@@ -332,7 +369,7 @@ public static class AssetStoreBatchMode
     {
 
         if(File.Exists(toPath))
-		    File.Delete(toPath);
+            File.Delete(toPath);
 
         var guids = GetGUIDS(package, localRootPath);
         Debug.Log("[Asset Store Batch Mode] Number of assets to export: " + guids.Length);
