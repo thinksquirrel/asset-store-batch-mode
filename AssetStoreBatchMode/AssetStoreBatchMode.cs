@@ -206,7 +206,7 @@ public static class AssetStoreBatchMode
         }
 
         // Validate root project folder
-        var projectFolder = Path.Combine(Application.dataPath, s_RootPath ?? string.Empty);
+        var projectFolder = Application.dataPath + "/" + (s_RootPath ?? string.Empty);
 
         if (!IsValidProjectFolder(projectFolder))
         {
