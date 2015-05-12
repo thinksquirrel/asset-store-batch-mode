@@ -330,7 +330,9 @@ public static class AssetStoreBatchMode
     }
     static void Export(Package package, string localRootPath, string toPath)
     {
-        File.Delete(toPath);
+
+        if(File.Exists(toPath))
+		    File.Delete(toPath);
 
         var guids = GetGUIDS(package, localRootPath);
         Debug.Log("[Asset Store Batch Mode] Number of assets to export: " + guids.Length);
