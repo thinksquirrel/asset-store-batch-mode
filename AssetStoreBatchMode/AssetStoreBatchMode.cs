@@ -189,22 +189,15 @@ public static class AssetStoreBatchMode
         }
 
         var packages = s_PackageDataSource.GetAllPackages();
-        var package = packages.FirstOrDefault(p => p.Name == s_PackageName);
+        var package = packages.FirstOrDefault(p => p.Name == s_PackageName && p.Status == Package.PublishedStatus.Draft);
 
         if (package == null)
         {
-            Debug.LogError("[Asset Store Batch Mode] Package: " + s_PackageName + " not found!");
+            Debug.LogError("[Asset Store Batch Mode] Draft package: " + s_PackageName + " not found!");
             Finish();
             return;
         }
-
-        if (package.Status != Package.PublishedStatus.Draft)
-        {
-            Debug.Log("[Asset Store Batch Mode] Package: " + s_PackageName + " is not in draft status. Cancelling upload.");
-            Finish();
-            return;
-        }
-
+        
         // Validate root project folder
         var projectFolder = Path.Combine(Application.dataPath, s_RootPath ?? string.Empty);
 
