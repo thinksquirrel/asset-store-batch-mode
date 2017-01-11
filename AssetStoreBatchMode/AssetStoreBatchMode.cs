@@ -46,7 +46,7 @@ public static class AssetStoreBatchMode
     /// </remarks>
     public static void UploadAssetStorePackage()
     {
-        UploadAssetStorePackage(Environment.GetCommandLineArgs());   
+        UploadAssetStorePackage(Environment.GetCommandLineArgs());
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public static class AssetStoreBatchMode
                 mainAssets.Add(mainAssetsSplit[i]);
             }
         }
-        
+
         var assets = mainAssets;
         var opt = new OptionSet
         {
@@ -91,12 +91,12 @@ public static class AssetStoreBatchMode
 
             { "asset_store_root_path=",
                 "The root path of the package (relative to Application.dataPath). If not present, use the project Assets folder.",
-                o => rootPath = o },            
-			
+                o => rootPath = o },
+
             { "asset_store_main_asset=",
                 "A main asset for the package (relative to Application.dataPath). Multiple options are allowed. If not present, do not upload or change any main assets.",
                 assets.Add },
-                
+
             { "asset_store_login_timeout=",
                 "The maximum amount of time to wait (in seconds) when logging in. Defaults to 10 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.",
                 (int o) => loginTimeout = o },
@@ -108,7 +108,7 @@ public static class AssetStoreBatchMode
             { "asset_store_upload_timeout=",
                 "The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.",
                 (int o) => uploadTimeout = o },
-            
+
             { "skip_project_settings",
                 "If true, always skip project settings export. This only applies to assets in the Complete Projects category.",
                 o => skipProjectSettings = o != null }
@@ -126,10 +126,10 @@ public static class AssetStoreBatchMode
     /// <param name="packageName">The package name. The package must be set to draft status in the Publisher Administration.</param>
     /// <param name="rootPath">The root path of the package (relative to Application.dataPath). If null, use the project Assets folder.</param>
     /// <param name="mainAssets">An array of the main assets for the package (relative to Application.dataPath). If null, do not upload or change any main assets.</param>
-    /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 10 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
-    /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 300 seconds. Must be within 2 and 36000 seconds.</param>
+    /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 90 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
+    /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 600 seconds. Must be within 2 and 36000 seconds.</param>
     /// <param name="uploadTimeout">The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.</param>
-    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 10, int metadataTimeout = 300, int uploadTimeout = 36000, bool skipProjectSettings = false)
+    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false)
     {
         if (string.IsNullOrEmpty(username))
             throw new ArgumentNullException("username");
@@ -158,15 +158,15 @@ public static class AssetStoreBatchMode
 
             EditorUserBuildSettings.SwitchActiveBuildTarget(EditorUserBuildSettings.selectedStandaloneTarget);
         }
-            
+
         Debug.Log("[Asset Store Batch Mode] Logging into the Asset Store...");
-            
+
         AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
 
         if (!WaitForUpdate(ref s_LoginDone, s_LoginTimeout))
         {
             Finish();
-                
+
             // Try again
             s_LoginDone = false;
             AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
@@ -177,7 +177,7 @@ public static class AssetStoreBatchMode
                 return;
             }
         }
-            
+
         AssetStoreAPI.GetMetaData(s_PublisherAccount, s_PackageDataSource, OnGetMetadata);
 
         Debug.Log("[Asset Store Batch Mode] Getting package metadata...");
@@ -197,7 +197,7 @@ public static class AssetStoreBatchMode
             Finish();
             return;
         }
-        
+
         // Validate root project folder
         var projectFolder = Path.Combine(Application.dataPath, s_RootPath ?? string.Empty);
 
@@ -263,7 +263,7 @@ public static class AssetStoreBatchMode
         s_LoginDone = true;
 
         if (errorMessage == null) return;
-            
+
         Debug.LogError("[Asset Store Batch Mode] " + errorMessage);
         Finish();
     }
@@ -273,7 +273,7 @@ public static class AssetStoreBatchMode
         s_GetMetadataDone = true;
 
         if (errorMessage == null) return;
-            
+
         Debug.LogError("[Asset Store Batch Mode] " + errorMessage);
         Finish();
     }
@@ -283,11 +283,11 @@ public static class AssetStoreBatchMode
         s_AssetsUploadedDone = true;
 
         if (errorMessage == null) return;
-            
+
         Debug.LogError("[Asset Store Batch Mode] " + errorMessage);
         Finish();
     }
-       
+
     // -----------------------------------------------
     // Helper functions
     // -----------------------------------------------
@@ -333,7 +333,7 @@ public static class AssetStoreBatchMode
 
         // Note - implementation here differs from Asset Store tools, in order to work properly in batch mode
         var paths = new string[guids.Length];
-            
+
         for (var i = 0; i < paths.Length; ++i)
         {
             paths[i] = AssetDatabase.GUIDToAssetPath(guids[i]);
@@ -402,7 +402,7 @@ public static class AssetStoreBatchMode
     }
     static string[] GetGUIDS(Package package, string localRootPath)
     {
-        var includeProjectSettings = package.IsCompleteProjects && !s_SkipProjectSettings;            
+        var includeProjectSettings = package.IsCompleteProjects && !s_SkipProjectSettings;
         var str1 = "Assets" + (localRootPath ?? string.Empty);
         var chars = new[] { (char)47 };
         var path1 = str1.Trim(chars);
@@ -483,7 +483,7 @@ internal class AssetStorePublisher : AssetStoreToolsReflectedType
 internal class PackageDataSource : AssetStoreToolsReflectedType
 {
     public PackageDataSource() : base(true) {}
-        
+
     public IList<Package> GetAllPackages()
     {
         var packages = GetRuntimeObject().Invoke("GetAllPackages") as IList;
@@ -499,7 +499,7 @@ internal class PackageDataSource : AssetStoreToolsReflectedType
         {
             packageList.Add(new Package(packages[i]));
         }
-            
+
         return packageList;
     }
 }
@@ -540,7 +540,7 @@ internal class Package : AssetStoreToolsReflectedType
 internal class AssetStoreClient : AssetStoreToolsReflectedType
 {
     static AssetStoreClient s_Instance;
-       
+
     static AssetStoreClient()
     {
         s_Instance = new AssetStoreClient();
@@ -581,7 +581,7 @@ internal class AssetStoreClient : AssetStoreToolsReflectedType
 internal class AssetStoreAPI : AssetStoreToolsReflectedType
 {
     static AssetStoreAPI s_Instance;
-       
+
     static AssetStoreAPI()
     {
         s_Instance = new AssetStoreAPI();
@@ -614,7 +614,7 @@ internal class AssetStoreAPI : AssetStoreToolsReflectedType
 internal class AssetStorePackageController : AssetStoreToolsReflectedType
 {
     static AssetStorePackageController s_Instance;
-       
+
     static AssetStorePackageController()
     {
         s_Instance = new AssetStorePackageController();
@@ -630,7 +630,7 @@ internal class AssetStorePackageController : AssetStoreToolsReflectedType
 internal class AssetServer : AssetStoreToolsReflectedType
 {
     static AssetServer s_Instance;
-       
+
     static AssetServer()
     {
         s_Instance = new AssetServer();
