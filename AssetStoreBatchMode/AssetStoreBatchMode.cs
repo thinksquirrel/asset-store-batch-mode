@@ -152,12 +152,14 @@ public static class AssetStoreBatchMode
 
         Finish();
 
+#if !UNITY_5_5_OR_NEWER
         if (Application.webSecurityEnabled)
         {
             Debug.Log("[Asset Store Batch Mode] Switching from Web Player platform...");
 
             EditorUserBuildSettings.SwitchActiveBuildTarget(EditorUserBuildSettings.selectedStandaloneTarget);
         }
+#endif
 
         Debug.Log("[Asset Store Batch Mode] Logging into the Asset Store...");
 
