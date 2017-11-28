@@ -408,14 +408,37 @@ public static class AssetStoreBatchMode
         var str1 = "Assets" + (localRootPath ?? string.Empty);
         var chars = new[] { (char)47 };
         var path1 = str1.Trim(chars);
-        var assetsItemArray = AssetServer.BuildExportPackageAssetListAssetsItems(AssetServer.CollectAllChildren(AssetDatabase.AssetPathToGUID(path1), new string[0]), true);
+        string[] guidArray = null;
+        object[] assetsItemArray = null;
+
+        if (typeof(DebugUtils).Assembly.GetType("UnityEditor.AssetServer") != null)
+        {
+            assetsItemArray = AssetServer.BuildExportPackageAssetListAssetsItems(AssetServer.CollectAllChildren(AssetDatabase.AssetPathToGUID(path1), new string[0]), true);
+        }
+        else
+        {
+            guidArray = Packager.BuildExportPackageAssetListGuids(Packager.CollectAllChildren(AssetDatabase.AssetPathToGUID(path1), new string[0]), true);
+        }
         var list = new List<string>();
         var str2 = path1.ToLower();
-        foreach (var assetsItem in assetsItemArray)
+        if (assetsItemArray != null)
         {
-            var str3 = AssetDatabase.GUIDToAssetPath(assetsItem.guid).ToLower();
-            if (str3.StartsWith("assets/plugins") || str3.Contains("standard assets") || str3.StartsWith(str2))
-                list.Add(assetsItem.guid);
+            foreach (var assetsItem in assetsItemArray)
+            {
+                var assetGuid = assetsItem.GetFieldValue<string>("guid");
+                var str3 = AssetDatabase.GUIDToAssetPath(assetGuid).ToLower();
+                if (str3.StartsWith("assets/plugins") || str3.Contains("standard assets") || str3.StartsWith(str2))
+                    list.Add(assetGuid);
+            }
+        }
+        else
+        {
+            foreach (var guid in guidArray)
+            {
+                var str3 = AssetDatabase.GUIDToAssetPath(guid).ToLower();
+                if (str3.StartsWith("assets/plugins") || str3.Contains("standard assets") || str3.StartsWith(str2))
+                    list.Add(guid);
+            }
         }
         if (includeProjectSettings)
         {
@@ -629,6 +652,7 @@ internal class AssetStorePackageController : AssetStoreToolsReflectedType
         return s_Instance.GetRuntimeType().Invoke<string>("GetLocalRootGUID", package.GetRuntimeObject().Param());
     }
 }
+
 internal class AssetServer : AssetStoreToolsReflectedType
 {
     static AssetServer s_Instance;
@@ -642,17 +666,49 @@ internal class AssetServer : AssetStoreToolsReflectedType
     {
         var assembly = typeof(DebugUtils).Assembly;
         SetRuntimeType(assembly.GetType("UnityEditor.AssetServer", true));
-    }
+     }
 
     public static string[] CollectAllChildren(string guid, string[] collection)
     {
         return s_Instance.GetRuntimeType().Invoke<string[]>("CollectAllChildren", guid.Param(), collection.Param());
     }
 
-    public static AssetsItem[] BuildExportPackageAssetListAssetsItems(string[] guids, bool dependencies)
+    public static object[] BuildExportPackageAssetListAssetsItems(string[] guids, bool dependencies)
     {
-        return s_Instance.GetRuntimeType().Invoke<AssetsItem[]>("BuildExportPackageAssetListAssetsItems", guids.Param(), dependencies.Param());
+        return s_Instance.GetRuntimeType().Invoke<object[]>("BuildExportPackageAssetListAssetsItems", guids.Param(), dependencies.Param());
     }
+
+    public static void ExportPackage(string[] guids, string path)
+    {
+        s_Instance.GetRuntimeType().Invoke("ExportPackage", guids.Param(), path.Param());
+    }
+}
+
+internal class Packager : AssetStoreToolsReflectedType
+{
+    static Packager s_Instance;
+
+    static Packager()
+    {
+        s_Instance = new Packager();
+    }
+
+    private Packager()
+    {
+        var assembly = typeof(DebugUtils).Assembly;
+        SetRuntimeType(assembly.GetType("Packager", true));
+     }
+
+    public static string[] CollectAllChildren(string guid, string[] collection)
+    {
+        return s_Instance.GetRuntimeType().Invoke<string[]>("CollectAllChildren", guid.Param(), collection.Param());
+    }
+
+    public static string[] BuildExportPackageAssetListGuids(string[] guids, bool dependencies)
+    {
+        return s_Instance.GetRuntimeType().Invoke<string[]>("BuildExportPackageAssetListGuids", guids.Param(), dependencies.Param());
+    }
+
     public static void ExportPackage(string[] guids, string path)
     {
         s_Instance.GetRuntimeType().Invoke("ExportPackage", guids.Param(), path.Param());
