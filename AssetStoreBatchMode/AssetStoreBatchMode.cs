@@ -203,6 +203,9 @@ public static class AssetStoreBatchMode
         // Validate root project folder
         var projectFolder = Path.Combine(Application.dataPath, s_RootPath ?? string.Empty);
 
+        // Convert to unix path style
+        projectFolder = projectFolder.Replace("\\", "/");
+
         if (!IsValidProjectFolder(projectFolder))
         {
             Debug.LogError("[Asset Store Batch Mode] Project folder is invalid");
@@ -325,7 +328,10 @@ public static class AssetStoreBatchMode
     }
     static void Export(Package package, string localRootPath, string toPath)
     {
-        File.Delete(toPath);
+        if (File.Exists(toPath))
+        {
+            File.Delete(toPath);
+        }
 
         var guids = GetGUIDS(package, localRootPath);
         Debug.Log("[Asset Store Batch Mode] Number of assets to export: " + guids.Length);
