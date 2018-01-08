@@ -203,6 +203,9 @@ public static class AssetStoreBatchMode
         // Validate root project folder
         var projectFolder = Path.Combine(Application.dataPath, s_RootPath ?? string.Empty);
 
+        // Convert to unix path style
+        projectFolder = projectFolder.Replace("\\", "/");
+
         if (!IsValidProjectFolder(projectFolder))
         {
             Debug.LogError("[Asset Store Batch Mode] Project folder is invalid");
