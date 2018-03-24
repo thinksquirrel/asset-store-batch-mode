@@ -3,6 +3,6 @@
   "version": "0.0.0",
   "description": "Asset Store Batch Mode",
   "license": "MIT",
-  "author": "Thinksquirrel Inc."
+  "author": "Thinksquirrel Inc.",
   "repository": "git@github.com:thinksquirrel/asset-store-batch-mode.git"
 }
