@@ -38,6 +38,9 @@ public static class AssetStoreBatchMode
     static bool s_AssetsUploadedDone;
     static readonly Stopwatch s_Stopwatch = new Stopwatch();
 
+    public delegate string[] GuidListPostprocessCallback(string[] guids);
+    static GuidListPostprocessCallback s_GuidListPostprocessCallback;
+
     /// <summary>
     /// Upload a package, using the command line arguments of the current environment.
     /// </summary>
@@ -116,7 +119,7 @@ public static class AssetStoreBatchMode
 
         opt.Parse(args);
 
-        UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings);
+        UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), null, loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings);
     }
     /// <summary>
     /// Upload a package, using the specified options.
@@ -129,7 +132,7 @@ public static class AssetStoreBatchMode
     /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 90 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
     /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 600 seconds. Must be within 2 and 36000 seconds.</param>
     /// <param name="uploadTimeout">The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.</param>
-    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false)
+    public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, GuidListPostprocessCallback guidListPostprocessCallback = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false)
     {
         if (string.IsNullOrEmpty(username))
             throw new ArgumentNullException("username");
@@ -145,6 +148,7 @@ public static class AssetStoreBatchMode
         s_PackageName = packageName;
         s_RootPath = rootPath;
         s_MainAssets = mainAssets;
+        s_GuidListPostprocessCallback = guidListPostprocessCallback;
         s_LoginTimeout = Mathf.Clamp(loginTimeout, 2, 36000);
         s_MetadataTimeout = Mathf.Clamp(metadataTimeout, 2, 36000);
         s_UploadTimeout = Mathf.Clamp(uploadTimeout, 2, 36000);
@@ -331,6 +335,10 @@ public static class AssetStoreBatchMode
         File.Delete(toPath);
 
         var guids = GetGUIDS(package, localRootPath);
+        if (s_GuidListPostprocessCallback != null)
+        {
+            guids = s_GuidListPostprocessCallback(guids);
+        }
         Debug.Log("[Asset Store Batch Mode] Number of assets to export: " + guids.Length);
 
         var sb = new StringBuilder();
