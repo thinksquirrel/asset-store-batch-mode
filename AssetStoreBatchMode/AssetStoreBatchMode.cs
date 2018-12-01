@@ -108,6 +108,7 @@ namespace Thinksquirrel.ASBM
         /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 90 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
         /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 600 seconds. Must be within 2 and 36000 seconds.</param>
         /// <param name="uploadTimeout">The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.</param>
+		/// <param name="guidListPostprocessCallback = null">Callback that takes the array of asset GUIDs and returns a modified one. Useful for filtering out unwanted assets.</param>
         public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false, GuidListPostprocessCallback guidListPostprocessCallback = null)
         {
             if (string.IsNullOrEmpty(username))
