@@ -39,6 +39,9 @@ namespace Thinksquirrel.ASBM
         static bool s_AssetsUploadedDone;
         static readonly Stopwatch s_Stopwatch = new Stopwatch();
 
+        public delegate string[] GuidListPostprocessCallback(string[] guids);
+        static GuidListPostprocessCallback s_GuidListPostprocessCallback;
+
         /// <summary>
         /// Upload a package, using the command line arguments of the current environment.
         /// </summary>
@@ -56,8 +59,7 @@ namespace Thinksquirrel.ASBM
         /// <remarks>
         /// The Asset Store account password must be provided via the "ASSET_STORE_PASSWORD" environment variable.
         /// </remarks>
-        public static void UploadAssetStorePackage(params string[] args)
-        {
+        public static void UploadAssetStorePackage(params string[] args) {
             var username = Environment.GetEnvironmentVariable("ASSET_STORE_USERNAME");
             var password = Environment.GetEnvironmentVariable("ASSET_STORE_PASSWORD");
             var packageName = Environment.GetEnvironmentVariable("ASSET_STORE_PACKAGE_NAME");
@@ -66,62 +68,34 @@ namespace Thinksquirrel.ASBM
             var metadataTimeout = 300;
             var uploadTimeout = 36000;
             var skipProjectSettings = false;
+			GuidListPostprocessCallback guidListPostprocessCallback = null;
 
             var mainAssets = new List<string>();
 
             var mainAssetsStr = Environment.GetEnvironmentVariable("ASSET_STORE_MAIN_ASSETS");
-            if (mainAssetsStr != null)
-            {
+            if (mainAssetsStr != null) {
                 var mainAssetsSplit = mainAssetsStr.Split(':');
-                for (var i = 0; i < mainAssetsSplit.Length; ++i)
-                {
+                for (var i = 0; i < mainAssetsSplit.Length; ++i) {
                     mainAssets.Add(mainAssetsSplit[i]);
                 }
             }
 
             var assets = mainAssets;
-            var opt = new OptionSet
-            {
-                { "asset_store_username=",
-                    "The username credential to use for package uploading.",
-                    o => username = o },
-
-                { "asset_store_password=",
-                    "The username credential to use for package uploading.",
-                    o => password = o },
-
-                { "asset_store_package_name=",
-                    "The package name. The package must be set to draft status in the Publisher Administration.",
-                    o => packageName = o },
-
-                { "asset_store_root_path=",
-                    "The root path of the package (relative to Application.dataPath). If not present, use the project Assets folder.",
-                    o => rootPath = o },
-
-                { "asset_store_main_asset=",
-                    "A main asset for the package (relative to Application.dataPath). Multiple options are allowed. If not present, do not upload or change any main assets.",
-                    assets.Add },
-
-                { "asset_store_login_timeout=",
-                    "The maximum amount of time to wait (in seconds) when logging in. Defaults to 10 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.",
-                    (int o) => loginTimeout = o },
-
-                { "asset_store_metadata_timeout=",
-                    "The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 300 seconds. Must be within 2 and 36000 seconds.",
-                    (int o) => metadataTimeout = o },
-
-                { "asset_store_upload_timeout=",
-                    "The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.",
-                    (int o) => uploadTimeout = o },
-
-                { "skip_project_settings",
-                    "If true, always skip project settings export. This only applies to assets in the Complete Projects category.",
-                    o => skipProjectSettings = o != null }
+            var opt = new OptionSet {
+                { "asset_store_username=", "The username credential to use for package uploading.", o => username = o },
+                { "asset_store_password=", "The username credential to use for package uploading.", o => password = o },
+                { "asset_store_package_name=", "The package name. The package must be set to draft status in the Publisher Administration.", o => packageName = o },
+                { "asset_store_root_path=", "The root path of the package (relative to Application.dataPath). If not present, use the project Assets folder.", o => rootPath = o },
+                { "asset_store_main_asset=", "A main asset for the package (relative to Application.dataPath). Multiple options are allowed. If not present, do not upload or change any main assets.", assets.Add },
+                { "asset_store_login_timeout=", "The maximum amount of time to wait (in seconds) when logging in. Defaults to 10 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.", (int o) => loginTimeout = o },
+                { "asset_store_metadata_timeout=", "The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 300 seconds. Must be within 2 and 36000 seconds.", (int o) => metadataTimeout = o },
+                { "asset_store_upload_timeout=", "The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.", (int o) => uploadTimeout = o },
+                { "skip_project_settings", "If true, always skip project settings export. This only applies to assets in the Complete Projects category.", o => skipProjectSettings = o != null }
             };
 
             opt.Parse(args);
 
-            UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings);
+			UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings, guidListPostprocessCallback);
         }
         /// <summary>
         /// Upload a package, using the specified options.
@@ -134,7 +108,8 @@ namespace Thinksquirrel.ASBM
         /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 90 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
         /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 600 seconds. Must be within 2 and 36000 seconds.</param>
         /// <param name="uploadTimeout">The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.</param>
-        public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false)
+		/// <param name="guidListPostprocessCallback = null">Callback that takes the array of asset GUIDs and returns a modified one. Useful for filtering out unwanted assets.</param>
+        public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false, GuidListPostprocessCallback guidListPostprocessCallback = null)
         {
             if (string.IsNullOrEmpty(username))
                 throw new ArgumentNullException("username");
@@ -154,6 +129,7 @@ namespace Thinksquirrel.ASBM
             s_MetadataTimeout = Mathf.Clamp(metadataTimeout, 2, 36000);
             s_UploadTimeout = Mathf.Clamp(uploadTimeout, 2, 36000);
             s_SkipProjectSettings = skipProjectSettings;
+            s_GuidListPostprocessCallback = guidListPostprocessCallback;
 
             Finish();
 
@@ -301,7 +277,6 @@ namespace Thinksquirrel.ASBM
             s_LoginDone = false;
             s_GetMetadataDone = false;
             s_AssetsUploadedDone = false;
-            AssetStoreClient.Update();
         }
         static bool WaitForUpdate(ref bool isDone, int timeout)
         {
@@ -358,6 +333,8 @@ namespace Thinksquirrel.ASBM
         {
             var localRootPath = path.Substring(Application.dataPath.Length);
 
+            var guids = GetGUIDS(package, localRootPath);
+            Debug.Log("[Asset Store Batch Mode] Number of assets to export: " + guids.Length);
             if (localRootPath == string.Empty)
                 localRootPath = "/";
 
@@ -452,6 +429,12 @@ namespace Thinksquirrel.ASBM
             }
             var array = new string[list.Count];
             list.CopyTo(array);
+
+			if (s_GuidListPostprocessCallback != null)
+			{
+				array = s_GuidListPostprocessCallback(array);
+			}
+
             return array;
         }
     }
