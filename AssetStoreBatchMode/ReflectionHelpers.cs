@@ -4,7 +4,7 @@ using System.Reflection;
 using UnityEditor;
 using Object = UnityEngine.Object;
 
-namespace Thinksquirrel.Development.Integration
+namespace Thinksquirrel.ASBM
 {
     struct Parameter
     {
