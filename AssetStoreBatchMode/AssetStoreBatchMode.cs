@@ -166,28 +166,38 @@ namespace Thinksquirrel.ASBM
             }
 #endif
 
-            Debug.Log("[Asset Store Batch Mode] Logging into the Asset Store...");
-
-            AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
-
-            if (!WaitForUpdate(ref s_LoginDone, s_LoginTimeout))
+            if (AssetStoreClient.LoggedIn() == false)
             {
-                Finish();
+                Debug.Log("[Asset Store Batch Mode] Logging into the Asset Store...");
 
-                // Try again
-                s_LoginDone = false;
                 AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
 
-                if (!WaitForUpdate(ref s_LoginDone, s_LoginTimeout))
+                if (!WaitForUpdate(ref s_LoginDone, s_LoginTimeout, false))
                 {
                     Finish();
-                    return;
+                    
+                    Debug.Log("[Asset Store Batch Mode] Attempting second login...");
+
+                    // Try again
+                    s_LoginDone = false;
+                    AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
+
+                    if (!WaitForUpdate(ref s_LoginDone, s_LoginTimeout))
+                    {
+                        Finish();
+                        return;
+                    }
                 }
             }
-
-            AssetStoreAPI.GetMetaData(s_PublisherAccount, s_PackageDataSource, OnGetMetadata);
+            else
+            {
+                Debug.Log("[Asset Store Batch Mode] Already logged in.");
+            }
 
             Debug.Log("[Asset Store Batch Mode] Getting package metadata...");
+            
+            AssetStoreAPI.GetMetaData(s_PublisherAccount, s_PackageDataSource, OnGetMetadata);
+
 
             if (!WaitForUpdate(ref s_GetMetadataDone, s_MetadataTimeout))
             {
@@ -303,7 +313,7 @@ namespace Thinksquirrel.ASBM
             s_AssetsUploadedDone = false;
             AssetStoreClient.Update();
         }
-        static bool WaitForUpdate(ref bool isDone, int timeout)
+        static bool WaitForUpdate(ref bool isDone, int timeout, bool errorOnTimeout = true)
         {
             s_Stopwatch.Reset();
             s_Stopwatch.Start();
@@ -312,8 +322,21 @@ namespace Thinksquirrel.ASBM
             {
                 AssetStoreClient.Update();
                 Thread.Sleep(10);
+                if (AssetStoreClient.LoginError())
+                {
+                    Debug.LogError("Found Login error: " + AssetStoreClient.LoginErrorMessage);
+                    break;
+                }
+                
                 if (!isDone && s_Stopwatch.Elapsed.TotalSeconds > timeout)
-                    throw new TimeoutException("Asset Store batch mode operation timed out.");
+                {
+                    if (errorOnTimeout)
+                    {
+                        throw new TimeoutException("Asset Store batch mode operation timed out.");
+                    }
+
+                    break;
+                }
             } while (!isDone);
 
             return isDone;
@@ -597,6 +620,21 @@ namespace Thinksquirrel.ASBM
         public static bool LoggedIn()
         {
             return s_Instance.GetRuntimeType().Invoke<bool>("LoggedIn");
+        }
+
+        public static bool LoginInProgress()
+        {
+            return s_Instance.GetRuntimeType().Invoke<bool>("LoginInProgress");
+        }
+
+        public static bool LoginError()
+        {
+            return s_Instance.GetRuntimeType().Invoke<bool>("LoginError");
+        }
+
+        public static string LoginErrorMessage
+        {
+            get { return (string)s_Instance.GetRuntimeType().GetProperty("LoginErrorMessage").GetValue(null, null); }
         }
         public static void LoginWithCredentials(string username, string password, bool rememberMe, DoneLoginCallback callback)
         {
