@@ -61,7 +61,7 @@ public static class AssetStoreBatchMode
         var password = Environment.GetEnvironmentVariable("ASSET_STORE_PASSWORD");
         var packageName = Environment.GetEnvironmentVariable("ASSET_STORE_PACKAGE_NAME");
         var rootPath = Environment.GetEnvironmentVariable("ASSET_STORE_ROOT_PATH");
-        var loginTimeout = 10;
+        var loginTimeout = 100;
         var metadataTimeout = 300;
         var uploadTimeout = 36000;
         var skipProjectSettings = false;
