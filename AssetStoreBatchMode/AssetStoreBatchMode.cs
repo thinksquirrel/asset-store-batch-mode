@@ -22,8 +22,11 @@ namespace Thinksquirrel.ASBM
             Login,
             WaitingForLogin,
             GetMetadata,
+            WaitingForMetadata,
             Upload,
+            WaitingForUpload,
             Error,
+            Finished
         }
 
         private static State currentState;
@@ -196,6 +199,7 @@ namespace Thinksquirrel.ASBM
 
         private static void Update()
         {
+            AssetStoreClient.Update();
             switch (CurrentState)
             {
                 case State.Login:
@@ -205,92 +209,27 @@ namespace Thinksquirrel.ASBM
                     WaitingForLogin();
                     return;
                 case State.GetMetadata:
+                    StartGetMetadata();
+                    return;
+                case State.WaitingForMetadata:
+                    WaitForMetadata();
+                    return;
                 case State.Upload:
+                    UploadPackage();
                     break;
+                case State.WaitingForUpload:
+                    WaitForUpload();
+                    break;
+                case State.Error:
+                case State.Finished:
+                    Finish();
+                    OnFinished();
+                    Debug.Log("FINISHED");
+                    EditorApplication.update -= Update;
+                    return;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
-
-            
-
-            Debug.Log("[Asset Store Batch Mode] Getting package metadata...");
-            
-            AssetStoreAPI.GetMetaData(s_PublisherAccount, s_PackageDataSource, OnGetMetadata);
-
-
-            if (!WaitForUpdate(ref s_GetMetadataDone, s_MetadataTimeout))
-            {
-                Finish();
-                return;
-            }
-
-            var packages = s_PackageDataSource.GetAllPackages();
-            var package = packages.FirstOrDefault(p => p.Name == s_PackageName && p.Status == Package.PublishedStatus.Draft);
-
-            if (package == null)
-            {
-                Debug.LogError("[Asset Store Batch Mode] Draft package: " + s_PackageName + " not found!");
-                Finish();
-                return;
-            }
-
-            // Validate root project folder
-            var projectFolder = Path.Combine(Application.dataPath, s_RootPath ?? string.Empty);
-
-            // Convert to unix path style
-            projectFolder = projectFolder.Replace("\\", "/");
-
-            if (!IsValidProjectFolder(projectFolder))
-            {
-                Debug.LogError("[Asset Store Batch Mode] Project folder is invalid");
-                Finish();
-                return;
-            }
-
-            // Set root asset path
-            var localRootPath = SetRootPath(package, projectFolder);
-
-            // TODO: Set main assets
-
-            // Verify content
-            var checkContent = CheckContent(package, localRootPath);
-            if (!string.IsNullOrEmpty(checkContent))
-            {
-                Debug.LogError("[Asset Store Batch Mode] " + checkContent);
-                Finish();
-                return;
-            }
-
-            var draftAssetsPath = GetDraftAssetsPath(localRootPath);
-
-            Export(package, localRootPath, draftAssetsPath);
-
-            // Upload assets
-            AssetStoreAPI.UploadAssets(
-                package,
-                AssetStorePackageController.GetLocalRootGUID(package),
-                localRootPath,
-                Application.dataPath,
-                draftAssetsPath,
-                OnAssetsUploaded, null);
-
-            Debug.Log("[Asset Store Batch Mode] Uploading asset...");
-
-            if (!WaitForUpdate(ref s_AssetsUploadedDone, s_UploadTimeout))
-            {
-                Finish();
-                return;
-            }
-
-            // TODO: Upload main assets
-
-            Debug.Log("[Asset Store Batch Mode] Asset successfully uploaded");
-
-            Finish();
-            
-            Debug.Log("FINISHED");
-            EditorApplication.update -= Update;
-            OnFinished();
         }
 
         private static void StartLogin()
@@ -313,7 +252,6 @@ namespace Thinksquirrel.ASBM
 
         private static void WaitingForLogin()
         {
-            AssetStoreClient.Update();
             if (s_LoginDone == false)
             {
                 if (AssetStoreClient.LoginError())
@@ -335,6 +273,110 @@ namespace Thinksquirrel.ASBM
             }
         }
 
+        private static void StartGetMetadata()
+        {
+            Debug.Log("[Asset Store Batch Mode] Getting package metadata...");
+            
+            s_Stopwatch.Reset();
+            s_Stopwatch.Start();
+            AssetStoreAPI.GetMetaData(s_PublisherAccount, s_PackageDataSource, OnGetMetadata);
+
+            CurrentState = State.WaitingForMetadata;
+        }
+
+        private static void WaitForMetadata()
+        {
+            if (s_GetMetadataDone == false)
+            {
+                if (s_Stopwatch.Elapsed.TotalSeconds > s_MetadataTimeout)
+                {
+                    Debug.LogError("Asset Store batch mode operation timed out.");
+                    CurrentState = State.Error;
+                }
+            }
+            else
+            {
+                CurrentState = State.Upload;
+            }
+        }
+
+        private static void UploadPackage()
+        {
+            var packages = s_PackageDataSource.GetAllPackages();
+            var package = packages.FirstOrDefault(p => p.Name == s_PackageName && p.Status == Package.PublishedStatus.Draft);
+
+            if (package == null)
+            {
+                Debug.LogError("[Asset Store Batch Mode] Draft package: " + s_PackageName + " not found!");
+                Finish();
+                CurrentState = State.Error;
+                return;
+            }
+
+            // Validate root project folder
+            var projectFolder = Path.Combine(Application.dataPath, s_RootPath ?? string.Empty);
+
+            // Convert to unix path style
+            projectFolder = projectFolder.Replace("\\", "/");
+
+            if (!IsValidProjectFolder(projectFolder))
+            {
+                Debug.LogError("[Asset Store Batch Mode] Project folder is invalid");
+                Finish();
+                CurrentState = State.Error;
+                return;
+            }
+
+            // Set root asset path
+            var localRootPath = SetRootPath(package, projectFolder);
+
+            // TODO: Set main assets
+
+            // Verify content
+            var checkContent = CheckContent(package, localRootPath);
+            if (!string.IsNullOrEmpty(checkContent))
+            {
+                Debug.LogError("[Asset Store Batch Mode] " + checkContent);
+                Finish();
+                CurrentState = State.Error;
+                return;
+            }
+
+            var draftAssetsPath = GetDraftAssetsPath(localRootPath);
+
+            Export(package, localRootPath, draftAssetsPath);
+            
+            // Upload assets
+            AssetStoreAPI.UploadAssets(
+                package,
+                AssetStorePackageController.GetLocalRootGUID(package),
+                localRootPath,
+                Application.dataPath,
+                draftAssetsPath,
+                OnAssetsUploaded, null);
+
+            Debug.Log("[Asset Store Batch Mode] Uploading asset...");
+
+            CurrentState = State.WaitingForUpload;
+        }
+
+        private static void WaitForUpload()
+        {
+            if (s_AssetsUploadedDone == false)
+            {
+                if (s_Stopwatch.Elapsed.TotalSeconds > s_UploadTimeout)
+                {
+                    Debug.LogError("Asset Store batch mode operation timed out.");
+                    CurrentState = State.Error;
+                }
+            }
+            else
+            {
+                Debug.Log("[Asset Store Batch Mode] Asset successfully uploaded");
+                CurrentState = State.Finished;
+            }
+        }
+
 
         static void OnLogin(string errorMessage)
         {
@@ -343,6 +385,7 @@ namespace Thinksquirrel.ASBM
             if (errorMessage == null) return;
 
             Debug.LogError("[Asset Store Batch Mode] " + errorMessage);
+            CurrentState = State.Error;
             Finish();
         }
 
@@ -354,6 +397,7 @@ namespace Thinksquirrel.ASBM
 
             Debug.LogError("[Asset Store Batch Mode] " + errorMessage);
             Finish();
+            CurrentState = State.Error;
         }
 
         static void OnAssetsUploaded(string errorMessage)
@@ -364,6 +408,7 @@ namespace Thinksquirrel.ASBM
 
             Debug.LogError("[Asset Store Batch Mode] " + errorMessage);
             Finish();
+            CurrentState = State.Error;
         }
 
         // -----------------------------------------------
