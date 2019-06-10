@@ -17,6 +17,19 @@ namespace Thinksquirrel.ASBM
     #region Main class
     public static class AssetStoreBatchMode
     {
+        public enum State
+        {
+            Login,
+            WaitingForLogin,
+            GetMetadata,
+            Upload,
+            Error,
+        }
+
+        private static State currentState;
+
+        public static event Action Finished;
+        
         // Input
         static string s_Username;
         static string s_Password;
@@ -38,6 +51,16 @@ namespace Thinksquirrel.ASBM
         static bool s_GetMetadataDone;
         static bool s_AssetsUploadedDone;
         static readonly Stopwatch s_Stopwatch = new Stopwatch();
+
+        public static State CurrentState
+        {
+            get { return currentState; }
+            set
+            {
+                Debug.Log("STATE: Current state changed to: " + value);
+                currentState = value;
+            }
+        }
 
         /// <summary>
         /// Upload a package, using the command line arguments of the current environment.
@@ -156,7 +179,7 @@ namespace Thinksquirrel.ASBM
             s_SkipProjectSettings = skipProjectSettings;
 
             Finish();
-
+            
 #if !UNITY_5_5_OR_NEWER
             if (Application.webSecurityEnabled)
             {
@@ -165,34 +188,30 @@ namespace Thinksquirrel.ASBM
                 EditorUserBuildSettings.SwitchActiveBuildTarget(EditorUserBuildSettings.selectedStandaloneTarget);
             }
 #endif
+            
+            EditorApplication.update += Update;
 
-            if (AssetStoreClient.LoggedIn() == false)
+
+        }
+
+        private static void Update()
+        {
+            switch (CurrentState)
             {
-                Debug.Log("[Asset Store Batch Mode] Logging into the Asset Store...");
-
-                AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
-
-                if (!WaitForUpdate(ref s_LoginDone, s_LoginTimeout, false))
-                {
-                    Finish();
-                    
-                    Debug.Log("[Asset Store Batch Mode] Attempting second login...");
-
-                    // Try again
-                    s_LoginDone = false;
-                    AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
-
-                    if (!WaitForUpdate(ref s_LoginDone, s_LoginTimeout))
-                    {
-                        Finish();
-                        return;
-                    }
-                }
+                case State.Login:
+                    StartLogin();
+                    return;
+                case State.WaitingForLogin:
+                    WaitingForLogin();
+                    return;
+                case State.GetMetadata:
+                case State.Upload:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
-            else
-            {
-                Debug.Log("[Asset Store Batch Mode] Already logged in.");
-            }
+
+            
 
             Debug.Log("[Asset Store Batch Mode] Getting package metadata...");
             
@@ -268,6 +287,52 @@ namespace Thinksquirrel.ASBM
             Debug.Log("[Asset Store Batch Mode] Asset successfully uploaded");
 
             Finish();
+            
+            Debug.Log("FINISHED");
+            EditorApplication.update -= Update;
+            OnFinished();
+        }
+
+        private static void StartLogin()
+        {
+            if (AssetStoreClient.LoggedIn() == false)
+            {
+                Debug.Log("[Asset Store Batch Mode] Logging into the Asset Store...");
+
+                s_Stopwatch.Reset();
+                s_Stopwatch.Start();
+                AssetStoreClient.LoginWithCredentials(s_Username, s_Password, false, OnLogin);
+                CurrentState = State.WaitingForLogin;
+            }
+            else
+            {
+                Debug.Log("[Asset Store Batch Mode] Already logged in.");
+                CurrentState = State.GetMetadata;
+            }
+        }
+
+        private static void WaitingForLogin()
+        {
+            AssetStoreClient.Update();
+            if (s_LoginDone == false)
+            {
+                if (AssetStoreClient.LoginError())
+                {
+                    Debug.LogError("Found Login error: " + AssetStoreClient.LoginErrorMessage);
+                    CurrentState = State.Error;
+                    return;
+                }
+                
+                if (s_Stopwatch.Elapsed.TotalSeconds > s_LoginTimeout)
+                {
+                    Debug.LogError("Asset Store batch mode operation timed out.");
+                    CurrentState = State.Error;
+                }
+            }
+            else
+            {
+                CurrentState = State.GetMetadata;
+            }
         }
 
 
@@ -476,6 +541,12 @@ namespace Thinksquirrel.ASBM
             var array = new string[list.Count];
             list.CopyTo(array);
             return array;
+        }
+
+        private static void OnFinished()
+        {
+            Action handler = Finished;
+            if (handler != null) handler();
         }
     }
     #endregion
