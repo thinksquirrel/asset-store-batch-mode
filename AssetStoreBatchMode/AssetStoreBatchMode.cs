@@ -357,17 +357,14 @@ namespace Thinksquirrel.ASBM
                 return;
             }
 
-            string draftAssetsPath;
+            var draftAssetsPath = GetDraftAssetsPath(localRootPath);
+            Export(package, localRootPath, draftAssetsPath);
+
             if (!string.IsNullOrEmpty(s_PackageDestination))
             {
-                draftAssetsPath = s_PackageDestination;
+                Debug.Log(string.Format("[Asset Store Batch Mode] Copying package to destination {0} -> {1}", draftAssetsPath, s_PackageDestination));
+                File.Copy(draftAssetsPath, s_PackageDestination, true);
             }
-            else
-            {
-                draftAssetsPath = GetDraftAssetsPath(localRootPath);
-            }
-
-            Export(package, localRootPath, draftAssetsPath);
 
             if (s_SkipUpload)
             {
