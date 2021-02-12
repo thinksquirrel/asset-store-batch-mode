@@ -1,0 +1,9 @@
+{
+    "name": "asset-store-batch-mode",
+    "references": [
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": []
+}
