@@ -46,6 +46,8 @@ namespace Thinksquirrel.ASBM
         static int s_MetadataTimeout;
         static int s_UploadTimeout;
         static bool s_SkipProjectSettings;
+        static bool s_SkipUpload;
+        static string s_PackageDestination;
 
         static readonly AssetStorePublisher s_PublisherAccount = new AssetStorePublisher();
         static readonly PackageDataSource s_PackageDataSource = new PackageDataSource();
@@ -92,6 +94,8 @@ namespace Thinksquirrel.ASBM
             var metadataTimeout = 300;
             var uploadTimeout = 36000;
             var skipProjectSettings = false;
+            var skipUpload = false;
+            string packageDestination = null;
 
             var mainAssets = new List<string>();
 
@@ -142,12 +146,20 @@ namespace Thinksquirrel.ASBM
 
                 { "skip_project_settings",
                     "If true, always skip project settings export. This only applies to assets in the Complete Projects category.",
-                    o => skipProjectSettings = o != null }
+                    o => skipProjectSettings = o != null },
+
+                { "skip_upload",
+                "If true, skip uploading the product to the asset store.",
+                o => skipUpload = o != null },
+
+                { "package_destination=",
+                "Path to copy the built .unitypackage to after creation.",
+                o => packageDestination = o }
             };
 
             opt.Parse(args);
 
-            UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings);
+            UploadAssetStorePackage(username, password, packageName, rootPath, mainAssets.ToArray(), loginTimeout, metadataTimeout, uploadTimeout, skipProjectSettings, skipUpload, packageDestination);
         }
         /// <summary>
         /// Upload a package, using the specified options.
@@ -160,7 +172,7 @@ namespace Thinksquirrel.ASBM
         /// <param name="loginTimeout">The maximum amount of time to wait (in seconds) when logging in. Defaults to 90 seconds. Must be within 2 and 36000 seconds. Login is attempted twice.</param>
         /// <param name="metadataTimeout">The maximum amount of time to wait (in seconds) when getting metadata. Defaults to 600 seconds. Must be within 2 and 36000 seconds.</param>
         /// <param name="uploadTimeout">The maximum amount of time to wait (in seconds) when uploading. Defaults to 36000 seconds. Must be within 2 and 36000 seconds.</param>
-        public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false)
+        public static void UploadAssetStorePackage(string username, string password, string packageName, string rootPath = null, string[] mainAssets = null, int loginTimeout = 90, int metadataTimeout = 600, int uploadTimeout = 36000, bool skipProjectSettings = false, bool skipUpload = false, string packageDestination=null)
         {
             if (string.IsNullOrEmpty(username))
                 throw new ArgumentNullException("username");
@@ -180,6 +192,9 @@ namespace Thinksquirrel.ASBM
             s_MetadataTimeout = Mathf.Clamp(metadataTimeout, 2, 36000);
             s_UploadTimeout = Mathf.Clamp(uploadTimeout, 2, 36000);
             s_SkipProjectSettings = skipProjectSettings;
+
+            s_SkipUpload = skipUpload;
+            s_PackageDestination = packageDestination;
 
             Finish();
             
@@ -342,10 +357,25 @@ namespace Thinksquirrel.ASBM
                 return;
             }
 
-            var draftAssetsPath = GetDraftAssetsPath(localRootPath);
+            string draftAssetsPath;
+            if (!string.IsNullOrEmpty(s_PackageDestination))
+            {
+                draftAssetsPath = s_PackageDestination;
+            }
+            else
+            {
+                draftAssetsPath = GetDraftAssetsPath(localRootPath);
+            }
 
             Export(package, localRootPath, draftAssetsPath);
-            
+
+            if (s_SkipUpload)
+            {
+                Debug.Log("[Asset Store Batch Mode] Dry run complete.");
+                CurrentState = State.Finished;
+                return;
+            }
+
             // Upload assets
             AssetStoreAPI.UploadAssets(
                 package,
